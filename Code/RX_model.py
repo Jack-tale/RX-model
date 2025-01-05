@@ -32,7 +32,7 @@ import warnings
 
 ## Calculating the probability values of single particle sources using the trained ResNet model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = torch.load("../Trained model/ResNet.pth")
+model = torch.load("../Trained model/ResNet.pth") #The "ResNet.pth" file is too large to upload to GitHub, so it has been uploaded to the Figshare platform (https://doi.org/10.6084/m9.figshare.28137446.v1).
 model.to(device)
 model.eval()
 
