@@ -27,12 +27,13 @@ from torchvision import transforms, models, datasets
 import warnings
 
 
-# ## RX model training
+# ## RX model
 
 
 ## Calculating the probability values of single particle sources using the trained ResNet model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = torch.load("../Trained model/ResNet.pth") #The "ResNet.pth" file is too large to upload to GitHub, so it has been uploaded to the Figshare platform (https://doi.org/10.6084/m9.figshare.28137446.v1).
+model = torch.load("../Trained model/ResNet.pth")
+# The "ResNet.pth" file is too large to upload to GitHub, so it has been uploaded to the Figshare platform (https://doi.org/10.6084/m9.figshare.28137446.v1).
 model.to(device)
 model.eval()
 
@@ -87,129 +88,19 @@ X_train = np.hstack([np.array(df),X_train])
 X_test = np.hstack([np.array(df2),X_test])
 
 
-# XGBoost model training
-
 le = LabelEncoder()
 y_train_le =  le.fit_transform(y_train)
 y_test_le =  le.fit_transform(y_test)
 le.classes_
 
-# Simple test
-XGB = XGBClassifier()
-XGB.fit(X_train, y_train_le)
-y_pred = XGB.predict(X_test)
-print(accuracy_score(y_test_le, y_pred))
+f = open("../Trained model/RX.pickle", 'rb')
+RX_model = pickle.load(f)
+f.close()
 
-
-# Parameter_tuning_1
-
-param_grid = {
-        "n_estimators": [100, 200, 300, 500],
-        "eta": [0.05, 0.1, 0,2, 0.3],
-        "max_depth": [3,4,5,6,7,8],
-        "colsample_bytree": [0.4,0.6,0.8,1],
-        "min_child_weight": [1,2,4,6,8]
-     }
-XGB = XGBClassifier()
-cv = StratifiedKFold(n_splits = 5, shuffle = True)
-RX_model = RandomizedSearchCV(XGB, param_distributions = param_grid, cv = cv, n_iter = 50, n_jobs = -1)
-starttime = datetime.datetime.now()
-RX_model.fit(X_train, y_train_le)
-endtime = datetime.datetime.now()
-
-print('Run time:', endtime - starttime)
-print(list(zip(RX_model.cv_results_['params'],RX_model.cv_results_['mean_test_score'])))
-print("Best params：:", RX_model.best_params_)
-print("Best score:", RX_model.best_score_)
-
-
-# Parameter_tuning_2
-
-param_grid = {
-        "n_estimators": [200, 300, 350, 400],
-        "eta": [0.03, 0.05, 0.1, 0,2],
-        "max_depth": [6,7,8,9, 10],
-        "colsample_bytree": [0.3, 0.4,0.6,0.8,1],
-        "min_child_weight": [3,4,5,7]
-     }
-XGB = XGBClassifier()
-cv = StratifiedKFold(n_splits = 5, shuffle = True)
-RX_model = GridSearchCV(XGB, param_grid = param_grid, cv = cv, n_jobs = -1)
-starttime = datetime.datetime.now()
-RX_model.fit(X_train, y_train_le)
-endtime = datetime.datetime.now()
-print('Run time:', endtime - starttime)
-print(list(zip(RX_model.cv_results_['params'],RX_model.cv_results_['mean_test_score'])))
-print("Best params：:", RX_model.best_params_)
-print("Best score:", RX_model.best_score_)
-
-
-
-# The performance of the model on (train, validation) sets
-
-RX_model = RX_model.best_estimator_
-
-
-scoring = {
-    'accuracy': 'accuracy',
-    'precision_weighted': 'precision_weighted',
-    'recall_weighted': 'recall_weighted',
-    'f1_weighted': 'f1_weighted',
-    'roc_auc_weighted': 'roc_auc_ovr_weighted',
-    'aupr_weighted': make_scorer(average_precision_score, average='weighted', needs_proba=True)
-}
-cv = StratifiedKFold(n_splits = 5, shuffle = True)
-scores = cross_validate(RX_model, X_train, y_train_le, scoring=scoring, cv=cv, return_train_score=False)
-
-# The performance of the model on test sets
 
 y_pred = RX_model.predict(X_test)
 y_pred_prob = RX_model.predict_proba(X_test)
 
-accuracy = accuracy_score(y_test_le, y_pred)
-precision_weighted = precision_score(y_test_le, y_pred, average='weighted')
-recall_weighted = recall_score(y_test_le, y_pred, average='weighted')
-f1_weighted = f1_score(y_test_le, y_pred, average='weighted')
-roc_auc_weighted = roc_auc_score(y_test_le, y_pred_prob, average='weighted', multi_class='ovr')
-aupr_weighted = average_precision_score(y_test_le, y_pred_prob, average='weighted')
-
-
-metrics = {
-    "Metric": ["Accuracy", "Precision_weighted", "Recall_weighted", "F1-Score_weighted", "ROC AUC_weighted", "AUPR_weighted"],
-    "Train_dataset(Mean)": [
-        scores['test_accuracy'].mean(),
-        scores['test_precision_weighted'].mean(),
-        scores['test_recall_weighted'].mean(),
-        scores['test_f1_weighted'].mean(),
-        scores['test_roc_auc_weighted'].mean(),
-        scores['test_aupr_weighted'].mean()
-    ],
-    "Train_dataset(Standard Deviation)": [
-        scores['test_accuracy'].std(),
-        scores['test_precision_weighted'].std(),
-        scores['test_recall_weighted'].std(),
-        scores['test_f1_weighted'].std(),
-        scores['test_roc_auc_weighted'].std(),
-        scores['test_aupr_weighted'].std()
-    ],
-    "Test_dataset": [
-        accuracy,
-        precision_weighted,
-        recall_weighted,
-        f1_weighted,
-        roc_auc_weighted,
-        aupr_weighted
-    ]
-}
-
-df_RX = pd.DataFrame(metrics)
-print(df_RX)
-df_RX.to_excel('../Out put/RX_results.xlsx', index=False, engine='openpyxl')
-
-# save the model
-f = open("../Trained model/RX.pickle", 'wb')
-pickle.dump(RX_model,f, protocol = pickle.HIGHEST_PROTOCOL)
-f.close()
 
 def multi_class_ROC(y_test, predict_proba, model_classes,fig_path = False):
     y_test_bin = label_binarize(y_test, classes=model_classes)
